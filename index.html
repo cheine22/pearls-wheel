@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEARLS Wheel of Destiny</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Bungee+Shade&family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1 id="title" aria-label="PEARLS Wheel of Destiny">PEARLS WHEEL OF DESTINY</h1>
+  <div class="marquee" aria-hidden="true"><div class="marquee-inner">
+    <span>🩺 WHO WILL PRESENT?! 🎤 NO ONE IS SAFE 🎡 THE WHEEL KNOWS ALL 👏 ROUND AND ROUND SHE GOES 🧠 WHERE SHE STOPS, SOMEBODY PRESENTS 🦁 </span>
+    <span>🩺 WHO WILL PRESENT?! 🎤 NO ONE IS SAFE 🎡 THE WHEEL KNOWS ALL 👏 ROUND AND ROUND SHE GOES 🧠 WHERE SHE STOPS, SOMEBODY PRESENTS 🦁 </span>
+  </div></div>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="wheel-wrap" id="wheelWrap">
+      <canvas id="wheel" aria-label="Spinning wheel of classmates"></canvas>
+      <button id="spin" class="hub" type="button">SPIN!</button>
+      <div class="pointer" id="pointer" aria-hidden="true"></div>
+    </div>
+    <p class="hint">Click the wheel or smash <kbd>Space</kbd> to spin</p>
+  </section>
+
+  <aside class="panel">
+    <h2>🎟️ The Contestants</h2>
+    <p class="count" id="count"></p>
+    <fieldset id="list"></fieldset>
+    <div class="buttons">
+      <button type="button" id="all">🔄 Everybody back in!</button>
+      <button type="button" id="shuffle">🔀 Shuffle</button>
+      <button type="button" id="clapBtn">👏 Applause on demand</button>
+      <button type="button" id="mute" aria-pressed="false">🔊 Sound: ON</button>
+    </div>
+  </aside>
+</main>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="winnerName">
+  <div class="burst" aria-hidden="true"></div>
+  <div class="card">
+    <p class="hype" id="hype">THE WHEEL HAS SPOKEN!</p>
+    <div class="winner-row">
+      <span class="clap" aria-hidden="true">👏</span>
+      <p class="winner" id="winnerName"></p>
+      <span class="clap flip" aria-hidden="true">👏</span>
+    </div>
+    <p class="sub" id="sub"></p>
+    <button type="button" id="remove" class="primary">Remove &amp; carry on 🎤</button>
+    <button type="button" id="keep" class="ghost">Oops — keep them on the wheel</button>
+  </div>
+</div>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div id="rain" aria-hidden="true"></div>
+<script src="app.js"></script>
+</body>
+</html>
