@@ -35,14 +35,55 @@
   const rand = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const body = document.body;
-  const FORCE = new URLSearchParams(location.search); // ?sus=0..  ?finale=0..  for trying a specific version
+  const PUNS = [
+    'Triggers are obligate, not facultative 🎤',
+    'Stay golden, like <i>Staph aureus</i> 💛',
+    "Don't be so Gram-negative 🧫",
+    'Catalase positive: we bubble under pressure 🫧',
+    '<i>Strep</i> in line and wait your turn ⛓️',
+    '<i>C. diff</i>-icult to predict who\'s next 🎡',
+    '<i>E. coli</i> me maybe 📞',
+    "Take a deep breath — don't be an obligate anaerobe 😮‍💨",
+    'Feeling tense? Blame <i>C. tetani</i> 😬',
+    'Something smells grape… must be <i>Pseudomonas</i> 🍇',
+    'May the spores be ever in your favor 🦠',
+    '<i>Listeria</i> up, class! 📣',
+    'Spirochete happens 🌀',
+    'Be a fun-gi about it 🍄',
+    '<i>Rickettsia</i> or not, here it comes 🎯',
+    'Urease-y does it 🧪',
+    'This wheel is beta-hemolytic: complete destruction of your free time 🩸',
+    '<i>Mycoplasma</i>: no wall can hold you back 🧱',
+    '<i>Treponema</i>-dous job, everyone 👏',
+    'Too <i>Legionella</i> to quit 💪',
+    "Even <i>Klebsiella</i> can't encapsulate itself from the wheel 🛡️",
+    '<i>Giardia</i> your loins 🎒',
+  ];
+
+  // ----- /dev review page: every behaviour in order, or pick the next one -----
+  const DEV = document.documentElement.hasAttribute('data-dev');
+  const devPick = {}, devSeq = {}, devLog = {};
+  const DEV_LABELS = {
+    kind: ['Normal spin', 'Suspense: long glide', 'Suspense: peg-by-peg lurch', 'Suspense: stop, then second wind',
+      'Final spin: flying flips', 'Final spin: wheel escapes', 'Final spin: movie trailer', 'Final spin: system overload'],
+    tips: ['Stops just short of the peg', 'Just tips over the peg'],
+    music: ['Heartbeat', 'Circling low notes', 'Trembling strings', 'Tick-tock + theremin'],
+    look: ['Zoom on pointer', 'Lights out', 'Shake + colour shift'],
+    entrance: ['Spin-pop', 'Drop in', 'Slam', 'Flip'],
+    fanfare: ['Ta-da + air horn', 'Charge! bugle', 'Harp sparkle', 'Brass stabs'],
+    party: ['Corner cannons', 'Fireworks', 'Shower'],
+  };
+  const DEV_TITLES = { kind: 'Next spin', tips: 'Suspense ending', music: 'Suspense music', look: 'Suspense look', entrance: 'Pop-up entrance', fanfare: 'Fanfare', party: 'Confetti' };
 
   // Deal variants from a shuffled deck (remembered between visits) so nothing
   // repeats until every version has had a turn.
   const decks = {};
   function dealFrom(key, n) {
-    const forced = parseInt(FORCE.get(key), 10);
-    if (forced >= 0 && forced < n) return forced;
+    if (DEV) { // in order, unless a specific one was picked
+      const v = devPick[key] >= 0 && devPick[key] < n ? devPick[key] : (devSeq[key] = ((devSeq[key] === undefined ? -1 : devSeq[key]) + 1) % n);
+      devLog[key] = v;
+      return v;
+    }
     let d = decks[key];
     if (!d) {
       try { d = JSON.parse(localStorage.getItem('pw-deck-' + key)); } catch (e) { /* no storage */ }
@@ -61,7 +102,7 @@
   }
 
   // ---------- state ----------
-  const off = new Set(NAMES);  // unchecked names: nobody is on the wheel until ticked
+  const off = new Set(DEV ? [] : NAMES);  // unchecked names: nobody is on the wheel until ticked
   const done = new Set();      // already presented
   const active = () => NAMES.filter((n) => !off.has(n));
 
@@ -69,6 +110,14 @@
   const title = $('title');
   title.innerHTML = [...title.textContent].map((ch, i) =>
     ch === ' ' ? '<span class="sp"></span>' : `<span style="animation-delay:${-i * 0.09}s">${ch}</span>`).join('');
+
+  // ---------- ticker tape ----------
+  const ticker = document.querySelector('.marquee-inner');
+  const tape = PUNS.join(' &nbsp;✦&nbsp; ') + ' &nbsp;✦&nbsp; ';
+  ticker.innerHTML = `<span>${tape}</span><span>${tape}</span>`;
+  const paceTicker = () => { ticker.style.animationDuration = Math.max(20, ticker.scrollWidth / 2 / 85) + 's'; }; // ~85px per second
+  paceTicker();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(paceTicker);
 
   // ---------- checklist + panel ----------
   const list = $('list'), panel = $('panel');
@@ -493,21 +542,24 @@
 
   function startSpin() {
     if (spin || modalOpen) return;
-    const names = active();
-    const n = names.length;
-    if (!n) {
+    let names = active();
+    if (!names.length) {
       setPanelHidden(false);
       panel.classList.remove('nudge'); void panel.offsetWidth; panel.classList.add('nudge');
       return;
     }
+    // Dev page: the queued behaviour decides the kind of spin (0 normal, 1-3 suspense, 4-7 final spin).
+    const kind = DEV ? devTakeKind() : -1;
+    if (kind >= 4) names = [pick(names)]; // preview a final spin without emptying the wheel
+    const n = names.length;
     audio();
     lastIdx = null;
     list.disabled = true;
     const t0 = performance.now();
 
-    if (n === 1) {
+    if (DEV ? kind >= 4 : n === 1) {
       // The grand finale: maximum suspense for a 100% certain outcome.
-      const fin = FINALES[dealFrom('finale', FINALES.length)];
+      const fin = FINALES[DEV ? kind - 4 : dealFrom('finale', FINALES.length)];
       rot = ((rot % TAU) + TAU) % TAU;
       spin = { phase: 'spin', finale: fin, t0, dur: fin.dur, from: rot, to: Math.PI + TAU, names, winner: 0 };
       restorePanel = !body.classList.contains('panel-hidden');
@@ -518,6 +570,7 @@
       showBanner(...fin.lines[0]);
       bannerTimer = setInterval(() => { i = Math.min(i + 1, fin.lines.length - 1); showBanner(...fin.lines[i]); }, fin.dur / fin.lines.length);
       if (ac) { moodBus = newBus(); fin.sound(moodBus, ac.currentTime + 0.02, fin.dur / 1000); crash(moodBus, ac.currentTime + fin.dur / 1000); }
+      devShow();
       return;
     }
 
@@ -526,13 +579,13 @@
     const turns = TAU * (6 + Math.floor(Math.random() * 4));
     // The pointer sits at angle 0 (right side). As the wheel turns, the pointer's
     // position inside a slice runs from 1 (just entered) down to 0 (about to leave).
-    if (Math.random() < SUSPENSE_ODDS || FORCE.has('sus')) {
+    if (DEV ? kind >= 1 : Math.random() < SUSPENSE_ODDS) {
       // Suspense spin: the wheel crawls up to a peg and either just tips over it or just doesn't.
       const d = Math.min(rand(0.03, 0.07) * seg, rand(0.02, 0.04));  // how far from the peg it stops
-      const tipsOver = Math.random() < 0.5;
+      const tipsOver = DEV ? dealFrom('tips', 2) === 1 : Math.random() < 0.5;
       const base = -(winner + (tipsOver ? 1 - d / seg : d / seg)) * seg;
       const final = base + TAU * Math.ceil((rot - base) / TAU) + turns;
-      const crawl = CRAWLS[dealFrom('crawl', CRAWLS.length)];
+      const crawl = CRAWLS[DEV ? kind - 1 : dealFrom('crawl', CRAWLS.length)];
       const D = Math.max(0.35, Math.min(0.9, seg * rand(0.9, 1.4))); // length of the crawl, in radians
       const T = rand(6000, 8000);                                     // and how long it takes
       const dur = rand(5000, 6500);
@@ -548,6 +601,7 @@
       spin = { phase: 'spin', t0, dur: rand(6500, 8500), from: rot, L: final - rot, k: 0, final, names, winner };
     }
     body.classList.add('spinning');
+    devShow();
   }
 
   function beginCrawl() {
@@ -557,6 +611,8 @@
     body.classList.add('sus', SUS_LOOKS[dealFrom('look', SUS_LOOKS.length)]);
     showBanner(...SUS_LINES[dealFrom('susline', SUS_LINES.length)]);
     if (ac) { moodBus = newBus(); SUS_MUSIC[dealFrom('music', SUS_MUSIC.length)](moodBus, ac.currentTime + 0.02, spin.sus.T / 1000); }
+    else dealFrom('music', SUS_MUSIC.length);
+    devShow();
   }
 
   function finishSpin() {
@@ -597,6 +653,7 @@
     cannon(); party();
     partyTimer = setInterval(party, extra ? 450 : 900);
     rainTimer = setInterval(drop, extra ? 45 : 90);
+    devShow();
   }
   function closeWinner(remove) {
     // Only a deliberate click on a pop-up button gets here; ignore accidental double-clicks.
@@ -723,6 +780,41 @@
   };
   document.addEventListener('keydown', onKey);
   document.addEventListener('keyup', onKey);
+
+  // ---------- dev review panel ----------
+  let devKindSel = null, devNow = null;
+  function devTakeKind() {
+    for (const k in devLog) delete devLog[k];
+    const v = +devKindSel.value;
+    devLog.kind = v;
+    devKindSel.value = (v + 1) % DEV_LABELS.kind.length; // queue the next behaviour in line
+    return v;
+  }
+  function devShow() {
+    if (!DEV) return;
+    devNow.textContent = 'Now playing → ' + Object.keys(DEV_LABELS).filter((k) => k in devLog)
+      .map((k) => (k === 'kind' ? '' : DEV_TITLES[k] + ': ') + DEV_LABELS[k][devLog[k]]).join('  ·  ');
+  }
+  if (DEV) {
+    const box = document.createElement('div');
+    box.id = 'dev';
+    box.innerHTML = '<strong>🛠 DEV REVIEW</strong>';
+    Object.keys(DEV_LABELS).forEach((key) => {
+      const label = document.createElement('label');
+      label.textContent = DEV_TITLES[key];
+      const sel = document.createElement('select');
+      if (key !== 'kind') sel.add(new Option('Auto (next in order)', -1));
+      DEV_LABELS[key].forEach((text, i) => sel.add(new Option(text, i)));
+      if (key === 'kind') devKindSel = sel;
+      else sel.addEventListener('change', () => { devPick[key] = +sel.value; });
+      label.append(sel);
+      box.append(label);
+    });
+    devNow = document.createElement('p');
+    devNow.textContent = 'Each spin plays the next behaviour in line. Pick one above to jump to it.';
+    box.append(devNow);
+    body.append(box);
+  }
 
   renderList();
   requestAnimationFrame(frame);
