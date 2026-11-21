@@ -529,7 +529,7 @@
   }
 
   // ---------- spinning ----------
-  const SUSPENSE_ODDS = 1 / 3;
+  const SUSPENSE_ODDS = 1 / 2;
   const smooth = (x) => x * x * (3 - 2 * x);
   // How the wheel covers its last stretch. q and the result both run 0..1;
   // s0 is the slope at q=0, used to hand over from the main spin without a jolt.
