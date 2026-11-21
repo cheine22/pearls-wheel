@@ -29,9 +29,11 @@
     <p class="hint">Click the wheel or smash <kbd>Space</kbd> to spin</p>
   </section>
 
-  <aside class="panel">
-    <h2>🎟️ The Contestants</h2>
-    <p class="count" id="count"></p>
+  <aside class="panel" id="panel">
+    <div class="panel-head">
+      <h2>🎟️ The Contestants</h2>
+      <button type="button" id="hidePanel" aria-label="Hide the names panel" title="Hide panel">✕</button>
+    </div>
     <fieldset id="list"></fieldset>
     <div class="buttons">
       <button type="button" id="clapBtn">👏 Applause on demand</button>
@@ -39,11 +41,13 @@
   </aside>
 </main>
 
+<button type="button" id="showPanel" aria-label="Show the names panel">🎟️ Names</button>
+
 <div id="banner" hidden aria-live="assertive"><p class="big" id="bannerBig"></p><p class="vs" id="bannerVs"></p></div>
 
 <div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="winnerName">
   <div class="burst" aria-hidden="true"></div>
-  <div class="card">
+  <div class="card" id="card">
     <p class="hype" id="hype">THE WHEEL HAS SPOKEN!</p>
     <div class="winner-row">
       <span class="clap" aria-hidden="true">👏</span>
