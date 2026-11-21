@@ -34,13 +34,12 @@
     <p class="count" id="count"></p>
     <fieldset id="list"></fieldset>
     <div class="buttons">
-      <button type="button" id="all">🔄 Everybody back in!</button>
-      <button type="button" id="shuffle">🔀 Shuffle</button>
       <button type="button" id="clapBtn">👏 Applause on demand</button>
-      <button type="button" id="mute" aria-pressed="false">🔊 Sound: ON</button>
     </div>
   </aside>
 </main>
+
+<div id="banner" hidden aria-live="assertive"><p class="big" id="bannerBig"></p><p class="vs" id="bannerVs"></p></div>
 
 <div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="winnerName">
   <div class="burst" aria-hidden="true"></div>

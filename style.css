@@ -213,7 +213,7 @@ fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 4px; }
   color: var(--blue);
   text-shadow: 4px 4px 0 var(--gold);
   animation: flash .5s steps(2) infinite;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 @keyframes flash { 50% { color: var(--orange); text-shadow: 4px 4px 0 var(--blue); } }
 .clap { font-size: clamp(2rem, 8vw, 4.5rem); animation: clap .28s ease-in-out infinite alternate; }
@@ -235,4 +235,56 @@ fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 4px; }
   .wheel-wrap { width: min(92vw, 62vh); }
   .panel { transform: none; max-width: 480px; width: 100%; margin: 0 auto; }
   fieldset { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---------- suspense banner ---------- */
+#banner {
+  position: fixed; top: 5vh; left: 0; right: 0; z-index: 9;
+  text-align: center; pointer-events: none; padding: 0 10px;
+}
+#banner p { margin: 0; font-family: 'Bungee', sans-serif; }
+#banner .big {
+  font-size: clamp(1.8rem, 7vw, 5rem); line-height: 1.05;
+  color: var(--gold);
+  text-shadow: 4px 4px 0 var(--navy), 8px 8px 0 var(--sky);
+  animation: thump .5s ease-in-out infinite;
+}
+#banner .vs {
+  display: inline-block; margin-top: 10px;
+  font-size: clamp(1.1rem, 3.6vw, 2.4rem);
+  background: var(--white); color: var(--blue);
+  border: 5px solid var(--navy); border-radius: 99px; padding: 4px 22px;
+  box-shadow: 6px 6px 0 var(--gold);
+  animation: wiggle .4s ease-in-out infinite;
+}
+@keyframes thump { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.12) rotate(2deg); } }
+
+/* ---------- photo finish (close call) ---------- */
+.stage { position: relative; }
+.wheel-wrap { transition: transform .7s cubic-bezier(.3, 1.4, .5, 1); }
+header, .panel, .hint { transition: opacity .5s; }
+body.closecall .stage, body.finale .stage { z-index: 5; }
+body.closecall .wheel-wrap { animation: none; transform: scale(1.5); transform-origin: 100% 50%; }
+body.closecall header, body.closecall .panel, body.closecall .hint { opacity: .12; }
+body.closecall::after { background: radial-gradient(circle at 60% 50%, rgba(11,27,77,.3) 0, rgba(5,10,35,.95) 70%); animation: pulseDark .6s ease-in-out infinite; }
+body.closecall .hub { animation: none; }
+body.closecall .pointer { background: #fff; filter: drop-shadow(0 0 14px var(--gold)); }
+@keyframes pulseDark { 50% { opacity: .75; } }
+
+/* ---------- the grand (pointless) finale ---------- */
+body.finale::before { background: repeating-conic-gradient(#00338D 0 10deg, #FFC72C 10deg 20deg); animation-duration: 3s; }
+body.finale header, body.finale .panel, body.finale .hint { opacity: .25; }
+body.finale .wheel-wrap { animation: loopy 7.6s ease-in-out both; }
+body.finale .hub { animation: pulse .25s linear infinite; }
+@keyframes loopy {
+  0%   { transform: translate(0, 0) perspective(900px) rotateY(0) rotateX(0) scale(1); }
+  10%  { transform: translate(-22vw, -8vh) perspective(900px) rotateY(0) rotateX(0) scale(.55); }
+  22%  { transform: translate(16vw, 9vh) perspective(900px) rotateY(360deg) rotateX(0) scale(1.2); }
+  35%  { transform: translate(-10vw, 12vh) perspective(900px) rotateY(360deg) rotateX(360deg) scale(.8); }
+  48%  { transform: translate(0, -14vh) perspective(900px) rotateY(720deg) rotateX(360deg) scale(.35); }
+  60%  { transform: translate(20vw, -6vh) perspective(900px) rotateY(720deg) rotateX(720deg) scale(1.25); }
+  72%  { transform: translate(-18vw, 6vh) perspective(900px) rotateY(1080deg) rotateX(720deg) scale(.6); }
+  86%  { transform: translate(0, 0) perspective(900px) rotateY(1440deg) rotateX(1080deg) scale(1.55); }
+  93%  { transform: translate(0, 0) perspective(900px) rotateY(1440deg) rotateX(1080deg) scale(.9); }
+  100% { transform: translate(0, 0) perspective(900px) rotateY(1440deg) rotateX(1080deg) scale(1); }
 }

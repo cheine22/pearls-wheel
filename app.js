@@ -1,13 +1,14 @@
 (() => {
   'use strict';
 
-  const NAMES = ['Cole', 'Harrison', 'Dani', 'Renee', 'Michael', 'Bella', 'Emma', 'Rob', 'Henry', 'Aria'];
+  const NAMES = ['Aria', 'Bella', 'Cole', 'Dani', 'Emma', 'Harrison', 'Henry', 'Michael', 'Renee', 'Rob'];
   const PALETTE = ['#00338D', '#FFC72C', '#0B1B4D', '#FFFFFF', '#2F80ED', '#FF9E1B'];
   const TEXT_ON = {
     '#00338D': '#FFC72C', '#FFC72C': '#0B1B4D', '#0B1B4D': '#FFFFFF',
     '#FFFFFF': '#00338D', '#2F80ED': '#FFFFFF', '#FF9E1B': '#0B1B4D',
   };
   const HYPE = ['THE WHEEL HAS SPOKEN!', 'COME ON DOWN!', 'NO TAKE-BACKSIES!', 'DESTINY HAS CHOSEN!', 'STEP RIGHT UP!', 'THE PROPHECY IS FULFILLED!'];
+  const CLOSE_HYPE = ['BY A WHISKER!', 'PHOTO FINISH!', 'BY THE SKIN OF THEIR TEETH!', 'THE JUDGES HAVE REVIEWED THE TAPE!'];
   const SUBS = [
     'Your PEARLS await. The crowd goes WILD! 🎉',
     'Clear your throat. Fix your hair. It is TIME. 🎤',
@@ -15,26 +16,26 @@
     'The people demand your learning objectives! 📚',
     'Legends are made in moments like this. 🦁',
   ];
+  const FINALE_LINES = [
+    ['🥁 THE FINAL SPIN! 🥁', 'One name. Infinite drama.'],
+    ['WHO COULD IT POSSIBLY BE?!', 'Honestly, no idea.'],
+    ['THE SUSPENSE IS UNBEARABLE!', 'Calculating odds…'],
+    ["IT'S ANYONE'S GAME!", '(it is not anyone\'s game)'],
+    ['HERE IT COMES…', 'Odds: 100.000%'],
+  ];
   const RAIN = ['👏', '🎉', '🩺', '⭐', '🎊', '🙌', '🧠', '🦁', '💛', '💙'];
-  const KEY = 'pearls-wheel-v1';
   const TAU = Math.PI * 2;
   const $ = (id) => document.getElementById(id);
   const rand = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const body = document.body;
 
   // ---------- state ----------
-  let order = [...NAMES];
   const off = new Set();   // unchecked names
   const done = new Set();  // already presented
-  try {
-    const s = JSON.parse(localStorage.getItem(KEY) || '{}');
-    (s.off || []).forEach((n) => NAMES.includes(n) && off.add(n));
-    (s.done || []).forEach((n) => NAMES.includes(n) && done.add(n));
-  } catch (e) { /* storage unavailable: start fresh */ }
-  const save = () => {
-    try { localStorage.setItem(KEY, JSON.stringify({ off: [...off], done: [...done] })); } catch (e) { /* ignore */ }
-  };
-  const active = () => order.filter((n) => !off.has(n));
+  // Nothing is stored: reloading the page puts everyone back on the wheel.
+  const save = () => {};
+  const active = () => NAMES.filter((n) => !off.has(n));
 
   // ---------- title letters ----------
   const title = $('title');
@@ -45,7 +46,7 @@
   const list = $('list');
   function renderList() {
     list.innerHTML = '';
-    order.forEach((name) => {
+    NAMES.forEach((name) => {
       const row = document.createElement('label');
       row.className = 'row' + (done.has(name) ? ' done' : '');
       const cb = document.createElement('input');
@@ -73,14 +74,13 @@
   }
 
   // ---------- audio (all synthesized, no files) ----------
-  let ac = null, master = null, noiseBuf = null, muted = false, applauseBus = null;
+  let ac = null, master = null, noiseBuf = null, applauseBus = null;
   function audio() {
     if (!ac) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       ac = new AC();
       master = ac.createGain();
-      master.gain.value = muted ? 0 : 1;
       const comp = ac.createDynamicsCompressor();
       master.connect(comp); comp.connect(ac.destination);
       noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
@@ -91,39 +91,38 @@
     return ac;
   }
 
-  function tick() {
+  function tick(freq = 1100) {
     const a = audio(); if (!a) return;
     const t = a.currentTime;
     const o = a.createOscillator(), g = a.createGain();
     o.type = 'triangle';
-    o.frequency.setValueAtTime(1100, t);
-    o.frequency.exponentialRampToValueAtTime(420, t + 0.04);
+    o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(freq * 0.4, t + 0.04);
     g.gain.setValueAtTime(0.22, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
     o.connect(g); g.connect(master);
     o.start(t); o.stop(t + 0.07);
   }
 
-  function clap(bus, when) {
+  // one burst of filtered noise: a clap, a snare hit, a cymbal...
+  function noiseHit(bus, when, type, freq, q, peak, decay) {
     const src = ac.createBufferSource();
     src.buffer = noiseBuf;
-    const bp = ac.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = rand(800, 2600);
-    bp.Q.value = rand(0.6, 2.5);
+    const f = ac.createBiquadFilter();
+    f.type = type; f.frequency.value = freq; f.Q.value = q;
     const g = ac.createGain();
-    const peak = rand(0.12, 0.4);
     g.gain.setValueAtTime(0.0001, when);
     g.gain.exponentialRampToValueAtTime(peak, when + 0.003);
-    g.gain.exponentialRampToValueAtTime(0.0001, when + rand(0.07, 0.16));
-    src.connect(bp); bp.connect(g);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + decay);
+    src.connect(f); f.connect(g);
     if (ac.createStereoPanner) {
       const p = ac.createStereoPanner();
       p.pan.value = rand(-0.9, 0.9);
       g.connect(p); p.connect(bus);
     } else g.connect(bus);
-    src.start(when, rand(0, 1.7), 0.2);
+    src.start(when, rand(0, 1.5), decay + 0.05);
   }
+  const clap = (bus, when) => noiseHit(bus, when, 'bandpass', rand(800, 2600), rand(0.6, 2.5), rand(0.12, 0.4), rand(0.07, 0.16));
 
   function tone(bus, type, freq, when, len, vol, endFreq) {
     const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter();
@@ -210,6 +209,34 @@
     applauseBus = null;
   }
 
+  // accelerating heartbeat + rising whine for the photo finish
+  function heartbeat(dur) {
+    const a = audio(); if (!a) return;
+    const t0 = a.currentTime + 0.02;
+    let t = 0, gap = 0.62;
+    while (t < dur - 0.2) {
+      [[0, 0.55], [0.14, 0.35]].forEach(([dt, vol]) => {
+        tone(master, 'sine', 75, t0 + t + dt, 0.16, vol, 42);
+        tone(master, 'triangle', 150, t0 + t + dt, 0.12, vol * 0.5, 80);
+      });
+      t += gap; gap = Math.max(0.27, gap * 0.87);
+    }
+    tone(master, 'sine', 220, t0, dur, 0.05, 880);
+    tone(master, 'sine', 223, t0, dur, 0.05, 900);
+  }
+
+  // drumroll, slide whistles and a cymbal crash for the final spin
+  function finaleSounds(dur) {
+    const a = audio(); if (!a) return;
+    const t0 = a.currentTime + 0.02;
+    for (let t = 0; t < dur; t += 0.04) {
+      noiseHit(master, t0 + t + rand(0, 0.008), 'highpass', 900, 0.7, 0.07 + 0.2 * (t / dur), 0.05);
+    }
+    noiseHit(master, t0 + dur, 'highpass', 5000, 0.5, 0.5, 1.4);
+    [[0.3, 500, 1500, 0.8], [2.0, 1500, 380, 0.9], [3.6, 420, 1700, 0.7], [5.0, 1700, 350, 0.9], [6.5, 350, 2000, 1.0]]
+      .forEach(([at, f1, f2, len]) => tone(master, 'sine', f1, t0 + at, len, 0.14, f2));
+  }
+
   // ---------- wheel ----------
   const canvas = $('wheel'), ctx = canvas.getContext('2d');
   const wrap = $('wheelWrap'), pointer = $('pointer');
@@ -224,10 +251,11 @@
   resize();
 
   let rot = Math.random() * TAU;
-  let spin = null;        // {t0, dur, from, to, names, winner}
-  let lastIdx = -1;
+  let spin = null;        // the spin in progress, if any
+  let lastIdx = null;
   let kick = 0;           // pointer deflection in degrees
   let modalOpen = false;
+  let bannerTimer = null;
 
   const segColor = (i, n) => (n > 1 && i === n - 1 && i % PALETTE.length === 0 ? PALETTE[2] : PALETTE[i % PALETTE.length]);
 
@@ -292,53 +320,116 @@
     ctx.restore();
   }
 
+  // ---------- suspense banner ----------
+  function showBanner(big, small) {
+    $('bannerBig').textContent = big;
+    $('bannerVs').textContent = small;
+    $('banner').hidden = false;
+  }
+  function hideBanner() {
+    clearInterval(bannerTimer); bannerTimer = null;
+    $('banner').hidden = true;
+  }
+
+  // ---------- spinning ----------
+  const CLOSE_CALL_ODDS = 2 / 3;
+  const TEASE_HOLD = 900, TEASE_WOBBLE = 3300;
+
   function startSpin() {
     if (spin || modalOpen) return;
     const names = active();
-    if (!names.length) { $('count').animate([{ transform: 'scale(1.3) rotate(-4deg)' }, { transform: 'none' }], 400); return; }
+    const n = names.length;
+    if (!n) { $('count').animate([{ transform: 'scale(1.3) rotate(-4deg)' }, { transform: 'none' }], 400); return; }
     audio();
-    const n = names.length, seg = TAU / n;
-    const winner = Math.floor(Math.random() * n);
-    // pointer sits at angle 0 (right side); land somewhere inside the winner's slice
-    const base = -(winner + rand(0.1, 0.9)) * seg;
-    const to = base + TAU * Math.ceil((rot - base) / TAU) + TAU * (6 + Math.floor(Math.random() * 4));
-    spin = { t0: performance.now(), dur: rand(6500, 8500), from: rot, to, names, winner };
-    lastIdx = -1;
+    lastIdx = null;
     list.disabled = true;
-    document.body.classList.add('spinning');
+    const t0 = performance.now();
+
+    if (n === 1) {
+      // The grand finale: maximum suspense for a 100% certain outcome.
+      rot = ((rot % TAU) + TAU) % TAU;
+      spin = { phase: 'spin', finale: true, t0, dur: 7600, from: rot, to: Math.PI + TAU, names, winner: 0 };
+      body.classList.add('finale');
+      let i = 0;
+      showBanner(...FINALE_LINES[0]);
+      bannerTimer = setInterval(() => { i = Math.min(i + 1, FINALE_LINES.length - 1); showBanner(...FINALE_LINES[i]); }, 1500);
+      finaleSounds(7.5);
+      return;
+    }
+
+    const seg = TAU / n;
+    const winner = Math.floor(Math.random() * n);
+    // The pointer sits at angle 0 (right side). As the wheel turns, the pointer's
+    // position inside a slice runs from 1 (just entered) down to 0 (about to leave).
+    let final, tease = null;
+    if (Math.random() < CLOSE_CALL_ODDS) {
+      const d = Math.min(rand(0.03, 0.06) * seg, rand(0.025, 0.045)); // gap to the dividing line
+      const leaving = Math.random() < 0.5;
+      final = -(winner + (leaving ? d / seg : 1 - d / seg)) * seg;
+      // The wheel first stops a hair off, then teeters back and forth over the line.
+      const A = (leaving ? 1 : -1) * d * 3.2 * (Math.random() < 0.5 ? 1 : -1);
+      tease = { A, rival: names[(winner + (leaving ? -1 : 1) + n) % n] };
+    } else {
+      final = -(winner + rand(0.15, 0.85)) * seg;
+    }
+    const target = final + (tease ? tease.A : 0);
+    const shift = TAU * Math.ceil((rot - target) / TAU) + TAU * (6 + Math.floor(Math.random() * 4));
+    spin = { phase: 'spin', t0, dur: rand(6500, 8500), from: rot, to: target + shift, final: final + shift, names, winner, tease };
+    body.classList.add('spinning');
+  }
+
+  function beginTease() {
+    spin.phase = 'tease';
+    spin.t1 = performance.now();
+    body.classList.remove('spinning');
+    body.classList.add('closecall');
+    const pair = [spin.names[spin.winner], spin.tease.rival];
+    if (Math.random() < 0.5) pair.reverse();
+    showBanner('📸 TOO CLOSE TO CALL! 📸', `${pair[0]}  vs  ${pair[1]}`);
+    heartbeat((TEASE_HOLD + TEASE_WOBBLE) / 1000);
   }
 
   function finishSpin() {
-    const name = spin.names[spin.winner];
+    const s = spin;
     spin = null;
     list.disabled = false;
-    document.body.classList.remove('spinning');
-    showWinner(name);
+    body.classList.remove('spinning', 'closecall', 'finale');
+    hideBanner();
+    const name = s.names[s.winner];
+    if (s.finale) showWinner(name, 'WHAT ARE THE ODDS?!', 'They were 100%. Last but NOT least! 🏆', true);
+    else if (s.tease) showWinner(name, pick(CLOSE_HYPE), `${s.tease.rival} escapes by a hair! 😅`);
+    else showWinner(name, pick(HYPE), pick(SUBS));
   }
 
   // ---------- winner modal ----------
   const modal = $('modal');
-  let currentWinner = null, partyTimer = null;
-  function showWinner(name) {
+  let currentWinner = null, partyTimer = null, rainTimer = null, shownAt = 0;
+  function showWinner(name, hype, sub, extra) {
     currentWinner = name;
     modalOpen = true;
+    shownAt = performance.now();
     $('winnerName').textContent = name + '!';
-    $('hype').textContent = pick(HYPE);
-    $('sub').textContent = pick(SUBS);
+    // long names shrink to stay on one line
+    const len = name.length + 1;
+    $('winnerName').style.fontSize = `min(7rem, ${(62 / len).toFixed(1)}vw, ${Math.round(520 / len)}px)`;
+    $('hype').textContent = hype;
+    $('sub').textContent = sub;
     modal.hidden = false;
-    document.body.classList.add('party');
-    $('remove').focus();
-    applause(9, true);
+    body.classList.add('party');
+    // Nothing is focused, so a stray Space/Enter can't dismiss the pop-up.
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    applause(extra ? 12 : 9, true);
     cannon();
-    partyTimer = setInterval(() => { cannon(); }, 900);
-    rainTimer = setInterval(drop, 90);
+    partyTimer = setInterval(cannon, extra ? 450 : 900);
+    rainTimer = setInterval(drop, extra ? 45 : 90);
   }
   function closeWinner(remove) {
-    if (!modalOpen) return;
+    // Only a deliberate click on a pop-up button gets here; ignore accidental double-clicks.
+    if (!modalOpen || performance.now() - shownAt < 700) return;
     if (remove && currentWinner) { off.add(currentWinner); done.add(currentWinner); save(); }
     modalOpen = false; currentWinner = null;
     modal.hidden = true;
-    document.body.classList.remove('party');
+    body.classList.remove('party');
     clearInterval(partyTimer); clearInterval(rainTimer);
     stopApplause();
     renderList();
@@ -382,7 +473,6 @@
 
   // ---------- emoji rain ----------
   const rain = $('rain');
-  let rainTimer = null;
   function drop() {
     const s = document.createElement('span');
     s.textContent = pick(RAIN);
@@ -396,15 +486,34 @@
   // ---------- main loop ----------
   function frame(ts) {
     if (spin) {
-      const p = Math.min(1, (performance.now() - spin.t0) / spin.dur);
-      rot = spin.from + (spin.to - spin.from) * (1 - Math.pow(1 - p, 4));
-      const seg = TAU / spin.names.length;
-      const idx = Math.floor((((-rot) % TAU) + TAU) % TAU / seg);
+      const now = performance.now();
+      let finished = false;
+      if (spin.phase === 'spin') {
+        const p = Math.min(1, (now - spin.t0) / spin.dur);
+        if (spin.finale) {
+          // forwards, backwards, forwards again... for no reason at all
+          rot = spin.from + (spin.to - spin.from) * p + TAU * 4 * Math.sin(p * Math.PI * 3) * (1 - p);
+        } else {
+          rot = spin.from + (spin.to - spin.from) * (1 - Math.pow(1 - p, 4));
+        }
+        if (p >= 1) { if (spin.tease) beginTease(); else finished = true; }
+      } else {
+        const u = now - spin.t1;
+        if (u < TEASE_HOLD) rot = spin.to;
+        else {
+          const v = Math.min(1, (u - TEASE_HOLD) / TEASE_WOBBLE);
+          rot = spin.final + spin.tease.A * Math.pow(1 - v, 2) * Math.cos(TAU * 2.5 * v);
+          if (v >= 1) finished = true;
+        }
+      }
+      const idx = spin.finale
+        ? Math.floor(rot / (TAU / 12))
+        : Math.floor((((-rot) % TAU) + TAU) % TAU / (TAU / spin.names.length));
       if (idx !== lastIdx) {
-        if (lastIdx !== -1) { tick(); kick = 28; }
+        if (lastIdx !== null) { tick(spin.phase === 'tease' ? 1700 : 1100); kick = 28; }
         lastIdx = idx;
       }
-      if (p >= 1) finishSpin();
+      if (finished) finishSpin();
     } else if (!modalOpen) {
       rot += 0.0025;
     }
@@ -420,29 +529,21 @@
   $('spin').addEventListener('click', startSpin);
   $('remove').addEventListener('click', () => closeWinner(true));
   $('keep').addEventListener('click', () => closeWinner(false));
-  $('all').addEventListener('click', () => { if (spin) return; off.clear(); done.clear(); save(); renderList(); });
-  $('shuffle').addEventListener('click', () => {
-    if (spin) return;
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
-    }
-    renderList();
-  });
   $('clapBtn').addEventListener('click', () => { applause(5, false); cannon(); });
-  $('mute').addEventListener('click', (e) => {
-    muted = !muted;
-    if (master) master.gain.value = muted ? 0 : 1;
-    e.currentTarget.textContent = muted ? '🔇 Sound: OFF' : '🔊 Sound: ON';
-    e.currentTarget.setAttribute('aria-pressed', String(muted));
-  });
-  document.addEventListener('keydown', (e) => {
-    if (modalOpen) { if (e.key === 'Escape') closeWinner(false); return; }
+  const onKey = (e) => {
+    if (modalOpen) {
+      // The pop-up only goes away when one of its buttons is clicked.
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') e.preventDefault();
+      return;
+    }
+    if (e.type !== 'keydown') return;
     const tag = e.target.tagName;
     if ((e.key === ' ' && tag !== 'INPUT' && tag !== 'BUTTON') || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
       e.preventDefault(); startSpin();
     }
-  });
+  };
+  document.addEventListener('keydown', onKey);
+  document.addEventListener('keyup', onKey);
 
   renderList();
   requestAnimationFrame(frame);
