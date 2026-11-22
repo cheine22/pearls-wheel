@@ -164,6 +164,7 @@
       if (!AC) return null;
       ac = new AC();
       master = ac.createGain();
+      master.gain.value = 0.6; // overall level: lively, not blaring
       const comp = ac.createDynamicsCompressor();
       master.connect(comp); comp.connect(ac.destination);
       noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
@@ -173,7 +174,7 @@
     if (ac.state === 'suspended') ac.resume();
     return ac;
   }
-  function newBus() { const b = ac.createGain(); b.connect(master); return b; }
+  function newBus(level = 1) { const b = ac.createGain(); b.gain.value = level; b.connect(master); return b; }
   function fadeBus(bus, secs) {
     if (!bus || !ac) return;
     const t = ac.currentTime;
@@ -189,7 +190,7 @@
     o.type = 'triangle';
     o.frequency.setValueAtTime(freq, t);
     o.frequency.exponentialRampToValueAtTime(freq * 0.4, t + 0.04);
-    g.gain.setValueAtTime(0.22, t);
+    g.gain.setValueAtTime(0.11, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
     o.connect(g); g.connect(master);
     o.start(t); o.stop(t + 0.07);
@@ -213,12 +214,12 @@
     } else g.connect(bus);
     src.start(when, rand(0, 1.5), decay + 0.05);
   }
-  const clap = (bus, when) => noiseHit(bus, when, 'bandpass', rand(800, 2600), rand(0.6, 2.5), rand(0.12, 0.4), rand(0.07, 0.16));
-  const crash = (bus, when) => noiseHit(bus, when, 'highpass', 5000, 0.5, 0.5, 1.4);
+  const clap = (bus, when) => noiseHit(bus, when, 'bandpass', rand(800, 2600), rand(0.6, 2.5), rand(0.08, 0.26), rand(0.07, 0.16));
+  const crash = (bus, when) => noiseHit(bus, when, 'highpass', 5000, 0.5, 0.25, 1.0);
 
   // one synth note, with optional pitch slide, swell, vibrato and tremolo
   function voice(bus, o) {
-    const { type = 'sine', f, f2, when, len, vol, vol2, lp = 2600, vib = 0, vibDepth = 0, trem = 0, tremDepth = 0 } = o;
+    const { type = 'sine', f, f2, when, len, vol, vol2, lp = 1700, vib = 0, vibDepth = 0, trem = 0, tremDepth = 0 } = o;
     const osc = ac.createOscillator(), g = ac.createGain(), fl = ac.createBiquadFilter();
     osc.type = type;
     osc.frequency.setValueAtTime(f, when);
@@ -263,10 +264,10 @@
       });
       tone(bus, 'sawtooth', 659, t0 + 0.45, 0.8, 0.08);
       tone(bus, 'sawtooth', 784, t0 + 0.45, 0.8, 0.08);
-      [[1.45, 0.16], [1.68, 0.16], [1.91, 0.75]].forEach(([at, len]) => {
-        tone(bus, 'sawtooth', 466, t0 + at, len, 0.1, 440);
-        tone(bus, 'sawtooth', 473, t0 + at, len, 0.1, 446);
-        tone(bus, 'square', 932, t0 + at, len, 0.04, 880);
+      [[1.45, 0.14], [1.66, 0.4]].forEach(([at, len]) => {
+        tone(bus, 'sawtooth', 466, t0 + at, len, 0.06, 440);
+        tone(bus, 'sawtooth', 473, t0 + at, len, 0.06, 446);
+        tone(bus, 'triangle', 932, t0 + at, len, 0.03, 880);
       });
     },
     (bus, t0) => { // stadium "charge!" bugle call
@@ -298,10 +299,10 @@
     applauseBus = bus;
 
     // a stadium's worth of individual claps
-    const env = (t) => (t < 0.5 ? 0.15 + t * 1.7 : t > dur - 3 ? Math.max(0, (dur - t) / 3) : 1);
+    const env = (t) => (t < 0.5 ? 0.15 + t * 1.7 : t > dur - 2.5 ? Math.max(0, (dur - t) / 2.5) : 1);
     let t = 0;
     while (t < dur) {
-      t += -Math.log(1 - Math.random()) / (75 * env(t) + 3);
+      t += -Math.log(1 - Math.random()) / (45 * env(t) + 3);
       clap(bus, t0 + t);
     }
 
@@ -312,14 +313,14 @@
     rf.type = 'bandpass'; rf.frequency.value = 700; rf.Q.value = 0.4;
     const rg = a.createGain();
     rg.gain.setValueAtTime(0.0001, t0);
-    rg.gain.exponentialRampToValueAtTime(0.3, t0 + 0.6);
-    rg.gain.setValueAtTime(0.3, t0 + dur - 3);
+    rg.gain.exponentialRampToValueAtTime(0.16, t0 + 0.6);
+    rg.gain.setValueAtTime(0.16, t0 + dur - 2.5);
     rg.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     roar.connect(rf); rf.connect(rg); rg.connect(bus);
     roar.start(t0); roar.stop(t0 + dur + 0.1);
 
     // "WOOOO!" whoops
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 4; i++) {
       const w = t0 + rand(0.2, dur - 2.5), f = rand(480, 820);
       const o = a.createOscillator(), g = a.createGain();
       o.type = 'triangle';
@@ -327,12 +328,12 @@
       o.frequency.exponentialRampToValueAtTime(f * 1.9, w + 0.22);
       o.frequency.exponentialRampToValueAtTime(f * 1.25, w + 0.7);
       g.gain.setValueAtTime(0.0001, w);
-      g.gain.exponentialRampToValueAtTime(0.07, w + 0.1);
+      g.gain.exponentialRampToValueAtTime(0.045, w + 0.1);
       g.gain.exponentialRampToValueAtTime(0.0001, w + 0.7);
       o.connect(g); g.connect(bus);
       o.start(w); o.stop(w + 0.75);
     }
-    if (fanfare >= 0) FANFARES[fanfare](bus, t0);
+    if (fanfare >= 0) { const fb = a.createGain(); fb.gain.value = 0.55; fb.connect(bus); FANFARES[fanfare](fb, t0); }
   }
   function stopApplause() { fadeBus(applauseBus, 0.5); applauseBus = null; }
 
@@ -416,17 +417,17 @@
   }
 
   const FINALES = [
-    { cls: 'finale-loopy', dur: 7600, sound: sndLoopy,
-      path: (p, a, b) => a + (b - a) * p + TAU * 4 * Math.sin(p * Math.PI * 3) * (1 - p),
+    { cls: 'finale-loopy', dur: 5000, sound: sndLoopy,
+      path: (p, a, b) => a + (b - a) * p + TAU * 3 * Math.sin(p * Math.PI * 3) * (1 - p),
       lines: [['🥁 THE FINAL SPIN! 🥁', 'One name. Infinite drama.'], ['WHO COULD IT POSSIBLY BE?!', 'Honestly, no idea.'], ['THE SUSPENSE IS UNBEARABLE!', 'Calculating odds…'], ["IT'S ANYONE'S GAME!", "(it is not anyone's game)"], ['HERE IT COMES…', 'Odds: 100.000%']] },
-    { cls: 'finale-rogue', dur: 8400, sound: sndRogue,
-      path: (p, a, b) => a + (b + TAU * 12 - a) * (1 - Math.pow(1 - p, 3)),
+    { cls: 'finale-rogue', dur: 5000, sound: sndRogue,
+      path: (p, a, b) => a + (b + TAU * 7 - a) * (1 - Math.pow(1 - p, 3)),
       lines: [["IT'S GONE ROGUE!", 'somebody catch it'], ['THE WHEEL IS LOOSE!', 'do not make eye contact'], ['SECURITY!!', "there's a wheel on the loose"], ["OK, IT'S COMING BACK", 'phew']] },
-    { cls: 'finale-epic', dur: 9500, sound: sndEpic,
+    { cls: 'finale-epic', dur: 5000, sound: sndEpic,
       path: (p, a, b) => a + (b - a) * (p * p * (3 - 2 * p)),
       lines: [['IN A WORLD…', '…with only one name left'], ['ONE WHEEL.', 'one slice.'], ['ONE DESTINY.', '(literally just the one)'], ['THIS SEMESTER…', 'the odds are 100%'], ['COMING SOON', 'right now, actually']] },
-    { cls: 'finale-overload', dur: 7800, sound: sndOverload,
-      path: (p, a, b) => a + (b - a) * p - TAU * 9 * Math.sin(Math.PI * p) * (1 - p),
+    { cls: 'finale-overload', dur: 5000, sound: sndOverload,
+      path: (p, a, b) => a + (b - a) * p - TAU * 6 * Math.sin(Math.PI * p) * (1 - p),
       lines: [['⚠️ SYSTEM OVERLOAD ⚠️', 'too much suspense detected'], ['WHEEL.EXE HAS STOPPED CARING', 'rebooting destiny…'], ['DIVIDING BY ONE…', 'result: 1'], ['ERROR 100%', 'certainty levels critical']] },
   ];
   const FINALE_REVEALS = [
@@ -572,17 +573,18 @@
       setPanelHidden(true);
       wrap.style.setProperty('--fdur', fin.dur + 'ms');
       body.classList.add('finale', fin.cls);
+      const lines = [fin.lines[0], fin.lines[1 + Math.floor(Math.random() * (fin.lines.length - 2))], fin.lines[fin.lines.length - 1]];
       let i = 0;
-      showBanner(...fin.lines[0]);
-      bannerTimer = setInterval(() => { i = Math.min(i + 1, fin.lines.length - 1); showBanner(...fin.lines[i]); }, fin.dur / fin.lines.length);
-      if (ac) { moodBus = newBus(); fin.sound(moodBus, ac.currentTime + 0.02, fin.dur / 1000); crash(moodBus, ac.currentTime + fin.dur / 1000); }
+      showBanner(...lines[0]);
+      bannerTimer = setInterval(() => { i = Math.min(i + 1, lines.length - 1); showBanner(...lines[i]); }, fin.dur / lines.length);
+      if (ac) { moodBus = newBus(0.55); fin.sound(moodBus, ac.currentTime + 0.02, fin.dur / 1000); crash(moodBus, ac.currentTime + fin.dur / 1000); }
       devShow();
       return;
     }
 
     const seg = TAU / n;
     const winner = Math.floor(Math.random() * n);
-    const turns = TAU * (6 + Math.floor(Math.random() * 4));
+    const turns = TAU * (3 + Math.floor(Math.random() * 2));
     // The pointer sits at angle 0 (right side). As the wheel turns, the pointer's
     // position inside a slice runs from 1 (just entered) down to 0 (about to leave).
     if (DEV ? kind >= 1 : Math.random() < SUSPENSE_ODDS) {
@@ -592,9 +594,9 @@
       const base = -(winner + (tipsOver ? 1 - d / seg : d / seg)) * seg;
       const final = base + TAU * Math.ceil((rot - base) / TAU) + turns;
       const crawl = CRAWLS[DEV ? kind - 1 : dealFrom('crawl', CRAWLS.length)];
-      const D = Math.max(0.35, Math.min(0.9, seg * rand(0.9, 1.4))); // length of the crawl, in radians
-      const T = rand(6000, 8000);                                     // and how long it takes
-      const dur = rand(5000, 6500);
+      const D = Math.max(0.3, Math.min(0.7, seg * rand(0.7, 1.1))); // length of the crawl, in radians
+      const T = rand(2300, 2800);                                     // and how long it takes
+      const dur = rand(1700, 2200);                                   // special spin: 4-5s in all
       const L = final - D - rot;
       spin = {
         phase: 'spin', t0, dur, from: rot, L, k: (crawl.s0 * D / T) * dur / L,
@@ -604,7 +606,7 @@
     } else {
       const base = -(winner + rand(0.15, 0.85)) * seg;
       const final = base + TAU * Math.ceil((rot - base) / TAU) + turns;
-      spin = { phase: 'spin', t0, dur: rand(6500, 8500), from: rot, L: final - rot, k: 0, final, names, winner };
+      spin = { phase: 'spin', t0, dur: rand(2000, 3000), from: rot, L: final - rot, k: 0, final, names, winner }; // normal spin: 2-3s
     }
     body.classList.add('spinning');
     devShow();
@@ -616,7 +618,7 @@
     body.classList.remove('spinning');
     body.classList.add('sus', SUS_LOOKS[dealFrom('look', SUS_LOOKS.length)]);
     showBanner(...SUS_LINES[dealFrom('susline', SUS_LINES.length)]);
-    if (ac) { moodBus = newBus(); SUS_MUSIC[dealFrom('music', SUS_MUSIC.length)](moodBus, ac.currentTime + 0.02, spin.sus.T / 1000); }
+    if (ac) { moodBus = newBus(0.55); SUS_MUSIC[dealFrom('music', SUS_MUSIC.length)](moodBus, ac.currentTime + 0.02, spin.sus.T / 1000); }
     else dealFrom('music', SUS_MUSIC.length);
     devShow();
   }
@@ -654,7 +656,7 @@
     body.classList.add('party');
     // Nothing is focused, so a stray Space/Enter can't dismiss the pop-up.
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    applause(extra ? 12 : 9, dealFrom('fanfare', FANFARES.length));
+    applause(extra ? 7.5 : 5.5, dealFrom('fanfare', FANFARES.length));
     const party = PARTIES[dealFrom('party', PARTIES.length)];
     cannon(); party();
     partyTimer = setInterval(party, extra ? 450 : 900);
@@ -771,7 +773,7 @@
   $('spin').addEventListener('click', startSpin);
   $('remove').addEventListener('click', () => closeWinner(true));
   $('keep').addEventListener('click', () => closeWinner(false));
-  $('clapBtn').addEventListener('click', () => { applause(5); PARTIES[dealFrom('party', PARTIES.length)](); });
+  $('clapBtn').addEventListener('click', () => { applause(4); PARTIES[dealFrom('party', PARTIES.length)](); });
   const onKey = (e) => {
     if (modalOpen) {
       // The pop-up only goes away when one of its buttons is clicked.
