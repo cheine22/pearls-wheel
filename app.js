@@ -71,8 +71,9 @@
   const devPick = {}, devSeq = {}, devLog = {};
   const DEV_LABELS = {
     kind: ['Normal spin', 'Suspense: long glide', 'Suspense: peg-by-peg lurch', 'Suspense: stop, then second wind',
-      'Final spin: flying flips', 'Final spin: wheel escapes', 'Final spin: movie trailer', 'Final spin: system overload'],
-    tips: ['Stops just short of the peg', 'Just tips over the peg'],
+      'Final spin: flying flips', 'Final spin: wheel escapes', 'Final spin: movie trailer', 'Final spin: system overload',
+      'Regular spin: wheel escapes'],
+    tips: ['Stops just short of the peg', 'Tips over to the next name'],
     music: ['Heartbeat', 'Circling low notes', 'Trembling strings', 'Tick-tock + theremin'],
     look: ['Zoom on pointer', 'Lights out', 'Shake + colour shift'],
     entrance: ['Spin-pop', 'Drop in', 'Slam', 'Flip'],
@@ -457,6 +458,7 @@
   let modalOpen = false;
   let bannerTimer = null;
   let restorePanel = false;
+  let spinNo = 0, lastEscape = -9;
 
   function drawWheel(ts) {
     const names = spin ? spin.names : active();
@@ -565,7 +567,7 @@
   // s0 is the slope at q=0, used to hand over from the main spin without a jolt.
   const CRAWLS = [
     { s0: 2, f: (q) => 1 - (1 - q) * (1 - q) },                                              // one long agonising glide
-    { s0: 2, f: (q) => 1 - (1 - q) * (1 - q) + 0.06 * Math.sin(TAU * 4 * q) * q * (1 - q) }, // lurching, peg by peg
+    { s0: 4, f: (q) => { const x = Math.min(q, 0.9999) * 4, i = Math.floor(x), u = Math.min(1, (x - i) / 0.5); return (i + 1 - (1 - u) * (1 - u)) / 4; } }, // four lurches with a breather after each
     { s0: 1.64 / 0.55, f: (q) => (q < 0.55 ? 0.82 * (1 - Math.pow(1 - q / 0.55, 2)) : q < 0.72 ? 0.82 : 0.82 + 0.18 * smooth((q - 0.72) / 0.28)) }, // stops... then finds a second wind
   ];
   const SUS_LOOKS = ['sus-zoom', 'sus-spot', 'sus-shake'];
@@ -580,14 +582,15 @@
     }
     // Dev page: the queued behaviour decides the kind of spin (0 normal, 1-3 suspense, 4-7 final spin).
     const kind = DEV ? devTakeKind() : -1;
-    if (kind >= 4) names = [pick(names)]; // preview a final spin without emptying the wheel
+    if (kind >= 4 && kind <= 7) names = [pick(names)]; // preview a final spin without emptying the wheel
     const n = names.length;
     audio();
     lastIdx = null;
     list.disabled = true;
     const t0 = performance.now();
 
-    if (DEV ? kind >= 4 : n === 1) {
+    spinNo++;
+    if (DEV ? kind >= 4 && kind <= 7 : n === 1) {
       // The grand finale: maximum suspense for a 100% certain outcome.
       const fin = FINALES[DEV ? kind - 4 : dealFrom('finale', FINALES.length)];
       rot = ((rot % TAU) + TAU) % TAU;
@@ -610,14 +613,37 @@
     const turns = TAU * (3 + Math.floor(Math.random() * 2));
     // The pointer sits at angle 0 (right side). As the wheel turns, the pointer's
     // position inside a slice runs from 1 (just entered) down to 0 (about to leave).
+    // The wheel breaks loose on a regular spin: always on the third spin of a
+    // visit, and now and then after that (never twice running).
+    const escapes = DEV ? kind === 8 : spinNo === 3 || (spinNo > 4 && spinNo - lastEscape > 2 && Math.random() < 0.12);
+    if (escapes) {
+      lastEscape = spinNo;
+      const fin = FINALES[1];
+      const base = -(winner + rand(0.2, 0.8)) * seg;
+      const final = base + TAU * Math.ceil((rot - base) / TAU) + TAU * 6;
+      spin = { phase: 'spin', escape: true, t0, dur: 4500, from: rot, L: final - rot, final, names, winner };
+      restorePanel = !body.classList.contains('panel-hidden');
+      setPanelHidden(true);
+      wrap.style.setProperty('--fdur', spin.dur + 'ms');
+      body.classList.add('finale', fin.cls);
+      const lines = [fin.lines[0], fin.lines[1 + Math.floor(Math.random() * (fin.lines.length - 2))], fin.lines[fin.lines.length - 1]];
+      let i = 0;
+      showBanner(...lines[0]);
+      bannerTimer = setInterval(() => { i = Math.min(i + 1, lines.length - 1); showBanner(...lines[i]); }, spin.dur / lines.length);
+      if (ac) { moodBus = newBus(0.55); fin.sound(moodBus, ac.currentTime + 0.02, spin.dur / 1000); crash(moodBus, ac.currentTime + spin.dur / 1000); }
+      devShow();
+      return;
+    }
     if (DEV ? kind >= 1 : nextIsSuspense()) {
-      // Suspense spin: the wheel crawls up to a peg and either just tips over it or just doesn't.
-      const d = Math.min(rand(0.03, 0.07) * seg, rand(0.02, 0.04));  // how far from the peg it stops
+      // Suspense spin: the wheel crawls up to a peg and either stops just short of it
+      // or tips over it and settles visibly inside the next name.
       const tipsOver = DEV ? dealFrom('tips', 2) === 1 : Math.random() < 0.5;
+      const d = tipsOver ? Math.min(rand(0.1, 0.18) * seg, rand(0.06, 0.09))   // how far past the peg it lands
+        : Math.min(rand(0.03, 0.07) * seg, rand(0.02, 0.04));                  // or how far short of it
       const base = -(winner + (tipsOver ? 1 - d / seg : d / seg)) * seg;
       const final = base + TAU * Math.ceil((rot - base) / TAU) + turns;
       const crawl = CRAWLS[DEV ? kind - 1 : dealFrom('crawl', CRAWLS.length)];
-      const D = Math.max(0.3, Math.min(0.7, seg * rand(0.7, 1.1))); // length of the crawl, in radians
+      const D = Math.max(0.42, Math.min(0.7, seg * rand(0.7, 1.1))); // length of the crawl, in radians
       const T = rand(2300, 2800);                                     // and how long it takes
       const dur = rand(1700, 2200);                                   // special spin: 4-5s in all
       const L = final - D - rot;
@@ -646,14 +672,21 @@
     devShow();
   }
 
-  function finishSpin() {
-    const s = spin;
-    spin = null;
-    rot = s.finale ? s.to : s.final;
-    list.disabled = false;
+  // The wheel has stopped: clear the stage and let everyone see where it
+  // landed for a moment before the pop-up covers it.
+  function settle() {
+    spin.phase = 'hold';
+    rot = spin.finale ? spin.to : spin.final;
     body.classList.remove('spinning', 'sus', 'finale', ...SUS_LOOKS, ...FINALES.map((f) => f.cls));
     hideBanner();
     fadeBus(moodBus, 0.25); moodBus = null;
+    setTimeout(finishSpin, spin.finale ? 600 : 1300);
+  }
+
+  function finishSpin() {
+    const s = spin;
+    spin = null;
+    list.disabled = false;
     const name = s.names[s.winner];
     if (s.finale) showWinner(name, ...FINALE_REVEALS[dealFrom('finalereveal', FINALE_REVEALS.length)], true);
     else if (s.sus) showWinner(name, pick(CLOSE_HYPE), pick(CLOSE_SUBS)(s.sus.rival));
@@ -755,13 +788,16 @@
 
   // ---------- main loop ----------
   function frame(ts) {
-    if (spin) {
+    if (spin && spin.phase !== 'hold') {
       const now = performance.now();
       let finished = false;
       if (spin.phase === 'spin') {
         const p = Math.min(1, (now - spin.t0) / spin.dur);
         if (spin.finale) {
           rot = spin.finale.path(p, spin.from, spin.to);
+          finished = p >= 1;
+        } else if (spin.escape) {
+          rot = spin.from + spin.L * (1 - Math.pow(1 - p, 3));
           finished = p >= 1;
         } else {
           // ease out; a suspense spin keeps a little speed (k) to carry into the crawl
@@ -780,8 +816,8 @@
         if (lastIdx !== null) { tick(spin.phase === 'crawl' ? 760 : 1100); kick = 28; }
         lastIdx = idx;
       }
-      if (finished) finishSpin();
-    } else if (!modalOpen) {
+      if (finished) settle();
+    } else if (!spin && !modalOpen) {
       rot += 0.0025;
     }
     kick *= 0.82;
