@@ -536,7 +536,30 @@
   }
 
   // ---------- spinning ----------
-  const SUSPENSE_ODDS = 1 / 2;
+  // Half of all spins are suspense spins. Dealt from a shuffled hand of two
+  // suspense + two normal (remembered between visits) rather than a coin flip,
+  // so a session can't go on a long unlucky run of plain spins; and never more
+  // than two plain spins in a row.
+  let susMem = null;
+  function nextIsSuspense() {
+    let d = susMem;
+    if (!d) { try { d = JSON.parse(localStorage.getItem('pw-sus')); } catch (e) { /* no storage */ } }
+    if (!d || !Array.isArray(d.left)) d = { left: [], plain: 0 };
+    d.left = d.left.filter((x) => x === 0 || x === 1);
+    if (!d.left.length) {
+      d.left = [1, 1, 0, 0];
+      for (let i = 3; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [d.left[i], d.left[j]] = [d.left[j], d.left[i]]; }
+    }
+    let v = d.left.pop();
+    if (v === 0 && d.plain >= 2) { // third plain spin in a row: take a suspense one instead
+      const i = d.left.indexOf(1);
+      if (i >= 0) { d.left[i] = 0; } v = 1;
+    }
+    d.plain = v ? 0 : (d.plain || 0) + 1;
+    try { localStorage.setItem('pw-sus', JSON.stringify(d)); } catch (e) { /* no storage */ }
+    susMem = d;
+    return v === 1;
+  }
   const smooth = (x) => x * x * (3 - 2 * x);
   // How the wheel covers its last stretch. q and the result both run 0..1;
   // s0 is the slope at q=0, used to hand over from the main spin without a jolt.
@@ -587,7 +610,7 @@
     const turns = TAU * (3 + Math.floor(Math.random() * 2));
     // The pointer sits at angle 0 (right side). As the wheel turns, the pointer's
     // position inside a slice runs from 1 (just entered) down to 0 (about to leave).
-    if (DEV ? kind >= 1 : Math.random() < SUSPENSE_ODDS) {
+    if (DEV ? kind >= 1 : nextIsSuspense()) {
       // Suspense spin: the wheel crawls up to a peg and either just tips over it or just doesn't.
       const d = Math.min(rand(0.03, 0.07) * seg, rand(0.02, 0.04));  // how far from the peg it stops
       const tipsOver = DEV ? dealFrom('tips', 2) === 1 : Math.random() < 0.5;
